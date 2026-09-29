@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TERAGRID-OPS // HYPERSCALE DISPATCH SCADA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700;800&display=swap');
+    body {
+      background-color: #04060a;
+      color: #94a3b8;
+      font-family: 'Barlow', sans-serif;
+      background-image: linear-gradient(rgba(15, 23, 42, 0.45) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(15, 23, 42, 0.45) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .font-scada { font-family: 'Share Tech Mono', monospace; }
+    .scada-panel {
+      background: #080c14;
+      border: 1px solid #1e293b;
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+    .scada-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 6px; height: 6px;
+      border-top: 2px solid #f59e0b;
+      border-left: 2px solid #f59e0b;
+    }
+    .scada-panel::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0; width: 6px; height: 6px;
+      border-bottom: 2px solid #f59e0b;
+      border-right: 2px solid #f59e0b;
+    }
+    .rack-blade { transition: all 0.15s ease; }
+    .rack-blade:hover { filter: brightness(1.3); outline: 1px solid #f59e0b; }
+    .chassis-slot { transition: all 0.2s ease; cursor: pointer; }
+    .chassis-slot:hover { border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+    .chassis-slot.active { border-color: #06b6d4; background: rgba(6, 182, 212, 0.12); }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-slate-300">
+
+  <!-- Top SCADA Operational Bar -->
+  <header class="h-12 bg-black border-b border-slate-800 px-4 flex items-center justify-between shrink-0 font-scada text-xs">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+        <span class="font-black tracking-widest text-slate-100 text-sm">TERAGRID//OPS</span>
+        <span class="px-1.5 py-0.2 bg-amber-950/80 text-amber-400 border border-amber-800 text-[10px]">SCADA v4.2</span>
+      </div>
+      <div class="h-4 w-px bg-slate-800"></div>
+      <div class="text-slate-400">
+        POD-04 // 40MW SUPERCLUSTER // H100 DIRECT LIQUID COOLED
+      </div>
+    </div>
+
+    <div class="flex items-center gap-6">
+      <div>FACILITY PUE: <span class="text-emerald-400 font-bold" id="live-pue">1.118</span></div>
+      <div>GRID DEMAND: <span class="text-amber-400 font-bold" id="live-grid-mw">13.84 MW</span> / 15.00 MW</div>
+      <div>CDU DELTA-P: <span class="text-cyan-400 font-bold">1.42 BAR</span></div>
+      <div class="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-700 px-2 py-0.5 rounded">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="text-emerald-400">MISSION CRITICAL: NOMINAL</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Frame -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- Industrial Left Sidebar Rail -->
+    <aside class="w-64 bg-[#070a12] border-r border-slate-800 p-3 flex flex-col justify-between shrink-0 font-scada text-xs">
+      <div class="space-y-1">
+        <div class="text-[10px] uppercase tracking-wider text-slate-500 px-2 py-1 font-bold">SCADA Control Nodes</div>
+        
+        <button type="button" onclick="showScadaTab(1)" id="rail-btn-1" class="w-full text-left px-3 py-2.5 rounded border border-amber-500/80 bg-amber-950/30 text-amber-300 font-bold flex items-center justify-between">
+          <span>[F01] AISLE THERMAL MAP</span>
+          <i class="fa-solid fa-fire-burner text-[10px]"></i>
+        </button>
+
+        <button type="button" onclick="showScadaTab(2)" id="rail-btn-2" class="w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between">
+          <span>[F02] THERMAL MITIGATION</span>
+          <i class="fa-solid fa-sliders text-[10px]"></i>
+        </button>
+
+        <button type="button" onclick="showScadaTab(3)" id="rail-btn-3" class="w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between">
+          <span>[F03] BESS PEAK ARBITRAGE</span>
+          <i class="fa-solid fa-battery-three-quarters text-[10px]"></i>
+        </button>
+
+        <button type="button" onclick="showScadaTab(4)" id="rail-btn-4" class="w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between">
+          <span>[F04] CHASSIS & CFD ENGINE</span>
+          <i class="fa-solid fa-microchip text-[10px]"></i>
+        </button>
+
+        <button type="button" onclick="showScadaTab(5)" id="rail-btn-5" class="w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between">
+          <span>[F05] SAFETY INTERLOCKS</span>
+          <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
+        </button>
+
+        <button type="button" onclick="showScadaTab(6)" id="rail-btn-6" class="w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between">
+          <span>[F06] MODBUS TELEMETRY</span>
+          <i class="fa-solid fa-terminal text-[10px]"></i>
+        </button>
+      </div>
+
+      <div class="border-t border-slate-800 pt-3 space-y-2">
+        <div class="text-[10px] uppercase text-slate-500 font-bold">Fault Injection Console</div>
+        <button type="button" onclick="setHotspotAlert(true)" class="w-full py-1.5 px-2 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-[11px] font-bold text-left flex items-center justify-between">
+          <span>Inject Hotspot (Rack-18)</span>
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+        </button>
+        <button type="button" onclick="setHotspotAlert(false)" class="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded text-[11px] text-left">
+          Restore Nominal Grid
+        </button>
+      </div>
+    </aside>
+
+    <!-- Workstation Canvas Area -->
+    <main class="flex-1 p-5 overflow-y-auto">
+
+      <!-- ==================== VIEW 1: Aisle Thermal Map ==================== -->
+      <section id="scada-view-1" class="space-y-4">
+        <div class="scada-panel p-3.5 flex justify-between items-center font-scada text-xs">
+          <div>
+            <span class="text-amber-400 font-bold text-sm">POD-04 THERMAL CONTAINMENT TOPOLOGY</span>
+            <p class="text-slate-400 text-[11px] font-sans">Dual-Aisle Direct-to-Chip Liquid Cooling System (40x 120kW Racks, 3,200x H100 SXM5 GPUs)</p>
+          </div>
+          <div class="flex items-center gap-3 text-[11px]">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-600 rounded-sm"></span>&lt;68°C SAFE</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-amber-500 rounded-sm"></span>68-78°C ELEVATED</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-rose-600 rounded-sm"></span>&gt;78°C CRITICAL</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-8 scada-panel p-4 space-y-3 font-scada">
+            <div>
+              <div class="text-[10px] text-cyan-400 font-bold mb-1.5 flex justify-between">
+                <span>ROW A: COLD AISLE SUPPLY [CDU-LOOP-01]</span>
+                <span>SUPPLY WATER TEMP: 24.2 °C</span>
+              </div>
+              <div class="grid grid-cols-10 gap-1.5" id="row-a-grid"></div>
+            </div>
+
+            <div class="h-6 bg-slate-950 border-y border-dashed border-cyan-800/80 flex items-center justify-center text-[10px] text-cyan-500/70 tracking-widest uppercase">
+              &darr;&darr; 4.2 Bar Chilled Supply Plenum Corridor &darr;&darr;
+            </div>
+
+            <div>
+              <div class="text-[10px] text-amber-400 font-bold mb-1.5 flex justify-between">
+                <span>ROW B: HOT AISLE EXHAUST [CDU-LOOP-02]</span>
+                <span>RETURN WATER TEMP: 48.6 °C</span>
+              </div>
+              <div class="grid grid-cols-10 gap-1.5" id="row-b-grid"></div>
+            </div>
+          </div>
+
+          <div class="col-span-4 scada-panel p-4 flex flex-col justify-between font-scada text-xs">
+            <div>
+              <div class="flex justify-between items-center pb-2 border-b border-slate-800 mb-3">
+                <span class="text-sm font-bold text-slate-100" id="diag-rack-id">RACK-18 DIAGNOSTICS</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold" id="diag-status">THROTTLING RISK</span>
+              </div>
+              <div class="space-y-2.5">
+                <div class="flex justify-between border-b border-slate-900 pb-1">
+                  <span class="text-slate-500">PEAK JUNCTION TEMP ($T_j$):</span>
+                  <span class="text-rose-400 font-bold text-sm" id="diag-temp">84.2 °C</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-900 pb-1">
+                  <span class="text-slate-500">ACTIVE RACK POWER:</span>
+                  <span class="text-slate-200" id="diag-power">138.4 kW</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-900 pb-1">
+                  <span class="text-slate-500">CDU VALVE APERTURE:</span>
+                  <span class="text-amber-400 font-bold" id="diag-valve">42% (Constrained)</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-900 pb-1">
+                  <span class="text-slate-500">COOLANT FLOW RATE:</span>
+                  <span class="text-slate-200" id="diag-flow">138 L/min</span>
+                </div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-slate-800 space-y-2">
+              <button type="button" onclick="showScadaTab(4)" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold uppercase rounded text-xs tracking-wider">
+                Inspect 48U Chassis CAD in [F04] &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 2: Thermal Mitigation ==================== -->
+      <section id="scada-view-2" style="display: none;" class="space-y-4 font-scada text-xs">
+        <div class="scada-panel p-3.5 flex justify-between items-center">
+          <div>
+            <span class="text-amber-400 font-bold text-sm">[F02] CLOSED-LOOP THERMAL MITIGATION SEQUENCER</span>
+            <p class="text-slate-400 text-[11px] font-sans">Multi-stage cooling modulation + Slurm scheduler dynamic node reallocation.</p>
+          </div>
+          <button type="button" onclick="executeMitigation()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase rounded tracking-wider">
+            Execute Mitigation Sequence
+          </button>
+        </div>
+
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-7 scada-panel p-4 space-y-3">
+            <span class="text-slate-400 font-bold block uppercase pb-2 border-b border-slate-800">Automated Dispatch Sequence Logic</span>
+            <div class="p-3 bg-black/60 border border-slate-800 rounded space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-slate-200">PHASE 1: CDU MODULATING VALVE DISPATCH</span>
+                <span class="text-emerald-400 text-[10px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800" id="phase-1-badge">STANDBY</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-sans">Override Rack-18 proportional valve from 42% to 92% aperture.</p>
+            </div>
+            <div class="p-3 bg-black/60 border border-slate-800 rounded space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-slate-200">PHASE 2: SLURM WORKLOAD EVACUATION</span>
+                <span class="text-cyan-400 text-[10px] bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800" id="phase-2-badge">STANDBY</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-sans">Reallocate 16x LLM training ranks to cold target Rack-05 & Rack-06.</p>
+            </div>
+            <div class="p-3 bg-black/60 border border-slate-800 rounded space-y-1">
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-slate-200">PHASE 3: NVML POWER CAPPING (TDP)</span>
+                <span class="text-amber-400 text-[10px] bg-amber-950 px-2 py-0.5 rounded border border-amber-800" id="phase-3-badge">STANDBY</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-sans">Temporarily clamp GPU TDP 700W &rarr; 550W until $T_j$ &lt; 70°C.</p>
+            </div>
+          </div>
+
+          <div class="col-span-5 scada-panel p-4 flex flex-col justify-between">
+            <div>
+              <span class="text-slate-400 font-bold block uppercase pb-2 border-b border-slate-800 mb-3">Hotspot Thermal Recovery Telemetry</span>
+              <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="p-3 bg-black/60 border border-rose-900/60 rounded">
+                  <span class="text-[10px] text-slate-400 block font-sans">PRE-MITIGATION $T_j$</span>
+                  <span class="text-2xl font-bold text-rose-400 mt-1 block">84.2 °C</span>
+                  <span class="text-[10px] text-rose-400">Severe Throttling</span>
+                </div>
+                <div class="p-3 bg-black/60 border border-emerald-900/60 rounded">
+                  <span class="text-[10px] text-slate-400 block font-sans">STABILIZED $T_j$</span>
+                  <span class="text-2xl font-bold text-emerald-400 mt-1 block" id="post-mitigation-temp">--.- °C</span>
+                  <span class="text-[10px] text-emerald-400" id="post-mitigation-delta">Awaiting Sequence</span>
+                </div>
+              </div>
+            </div>
+            <div class="p-3 bg-black/80 rounded border border-slate-800 text-[11px] text-slate-400 mt-4 leading-relaxed font-sans">
+              <strong class="text-slate-200 font-scada block mb-1">[SAFETY LOG]:</strong>
+              Zero distributed training ranks dropped. Checkpointing maintained on InfiniBand fabric without interruption.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 3: BESS Peak Shaving ==================== -->
+      <section id="scada-view-3" style="display: none;" class="space-y-4 font-scada text-xs">
+        <div class="grid grid-cols-4 gap-3">
+          <div class="scada-panel p-3">
+            <span class="text-[10px] text-slate-500 uppercase block">UTILITY CONTRACT CAP</span>
+            <span class="text-xl font-bold text-amber-400 mt-0.5 block">15.00 MW</span>
+            <span class="text-[10px] text-slate-400">Surge Penalty: $48.50/kW</span>
+          </div>
+          <div class="scada-panel p-3">
+            <span class="text-[10px] text-slate-500 uppercase block">BESS PACK CAPACITY</span>
+            <span class="text-xl font-bold text-emerald-400 mt-0.5 block">20.0 MWh</span>
+            <span class="text-[10px] text-emerald-400">State of Charge: 88.4%</span>
+          </div>
+          <div class="scada-panel p-3">
+            <span class="text-[10px] text-slate-500 uppercase block">BESS DISCHARGE RATE</span>
+            <span class="text-xl font-bold text-cyan-400 mt-0.5 block" id="bess-discharge-rate">2.40 MW</span>
+            <span class="text-[10px] text-cyan-400">Active Peak Shaving</span>
+          </div>
+          <div class="scada-panel p-3">
+            <span class="text-[10px] text-slate-500 uppercase block">AVOIDED SURGE PENALTY</span>
+            <span class="text-xl font-bold text-emerald-400 mt-0.5 block">$482,500</span>
+            <span class="text-[10px] text-slate-400">Monthly Demand Charge</span>
+          </div>
+        </div>
+
+        <div class="scada-panel p-4">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold uppercase text-slate-300">24-Hour Load Curve Shaving & Microgrid Synchronization</span>
+            <button type="button" onclick="simulateSpike()" class="px-2.5 py-1 bg-amber-950 text-amber-300 border border-amber-800 rounded text-xs hover:bg-amber-900">
+              Simulate 16.8MW Cluster Training Spike
+            </button>
+          </div>
+          <div class="w-full h-64 bg-black rounded border border-slate-900 flex items-center justify-center">
+            <canvas id="bessCanvas" width="900" height="240"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 4: CHASSIS CAD & CFD HEAT ENGINE ==================== -->
+      <section id="scada-view-4" style="display: none;" class="space-y-4 font-scada text-xs">
+        <div class="scada-panel p-3.5 flex justify-between items-center">
+          <div>
+            <span class="text-cyan-400 font-bold text-sm">[F04] 48U HIGH-DENSITY RACK CHASSIS CAD & MICRO-CHANNEL CFD</span>
+            <p class="text-slate-400 text-[11px] font-sans">Engineering cutaway of 8x 4U SXM5 GPU trays + Real-time particle CFD heat transfer simulation.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-slate-400">RACK: <strong class="text-slate-200">RACK-18 (HOTSPOT TARGET)</strong></span>
+            <span class="px-2 py-0.5 bg-rose-950 text-rose-300 border border-rose-800 rounded font-bold">138.4 kW LIQUID COOLED</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-4">
+          <!-- Left: 48U Rack Chassis Mechanical Cutaway (CAD View) -->
+          <div class="col-span-5 scada-panel p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center pb-2 border-b border-slate-800 mb-3">
+                <span class="font-bold text-slate-300 uppercase">48U Rack Architectural Cutaway</span>
+                <span class="text-[10px] text-cyan-400 font-bold">48V DC BUSBAR ACTIVE</span>
+              </div>
+
+              <!-- Top CDU In-Rack Manifold -->
+              <div class="p-2 mb-2 bg-cyan-950/40 border border-cyan-800/80 rounded flex justify-between items-center text-[10px]">
+                <span class="text-cyan-300 font-bold"><i class="fa-solid fa-arrows-split-up-and-left mr-1"></i>TOP-MOUNTED IN-RACK CDU MANIFOLD</span>
+                <span class="text-cyan-400 font-mono">SUPPLY: 24.2°C / 4.2 Bar</span>
+              </div>
+
+              <!-- 8x 4U Server Trays Stack -->
+              <div class="space-y-1.5" id="chassis-stack">
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(8)">
+                  <div><strong class="text-slate-300 text-xs">U41-U44:</strong> <span class="text-slate-400">Tray #08 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">66.2°C</span> <span class="text-[10px] text-slate-500">| 17.2 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(7)">
+                  <div><strong class="text-slate-300 text-xs">U36-U39:</strong> <span class="text-slate-400">Tray #07 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">67.8°C</span> <span class="text-[10px] text-slate-500">| 17.4 kW</span></div>
+                </div>
+                <div class="chassis-slot active p-2 bg-slate-950 border border-cyan-500 rounded flex justify-between items-center" id="slot-tray-6" onclick="selectTray(6)">
+                  <div><strong class="text-cyan-300 text-xs">U31-U34:</strong> <span class="text-slate-200 font-bold">Tray #06 [HOTTEST TRAY]</span></div>
+                  <div class="text-right"><span class="text-rose-400 font-bold text-sm">84.2°C</span> <span class="text-[10px] text-rose-500">| 18.2 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(5)">
+                  <div><strong class="text-slate-300 text-xs">U26-U29:</strong> <span class="text-slate-400">Tray #05 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-amber-400 font-bold">74.1°C</span> <span class="text-[10px] text-slate-500">| 17.8 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(4)">
+                  <div><strong class="text-slate-300 text-xs">U21-U24:</strong> <span class="text-slate-400">Tray #04 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">68.4°C</span> <span class="text-[10px] text-slate-500">| 17.2 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(3)">
+                  <div><strong class="text-slate-300 text-xs">U16-U19:</strong> <span class="text-slate-400">Tray #03 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">65.8°C</span> <span class="text-[10px] text-slate-500">| 17.0 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(2)">
+                  <div><strong class="text-slate-300 text-xs">U11-U14:</strong> <span class="text-slate-400">Tray #02 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">64.9°C</span> <span class="text-[10px] text-slate-500">| 16.9 kW</span></div>
+                </div>
+                <div class="chassis-slot p-2 bg-slate-950 border border-slate-800 rounded flex justify-between items-center" onclick="selectTray(1)">
+                  <div><strong class="text-slate-300 text-xs">U06-U09:</strong> <span class="text-slate-400">Tray #01 [8x H100 SXM5]</span></div>
+                  <div class="text-right"><span class="text-emerald-400 font-bold">64.2°C</span> <span class="text-[10px] text-slate-500">| 16.7 kW</span></div>
+                </div>
+              </div>
+
+              <!-- Bottom Power Shelf & Return QD -->
+              <div class="mt-2 p-2 bg-amber-950/30 border border-amber-800/60 rounded flex justify-between items-center text-[10px]">
+                <span class="text-amber-400 font-bold">U01-U05: 48V DC RECTIFIER POWER SHELF (150kW N+1)</span>
+                <span class="text-amber-300">RETURN QD: 48.6°C</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Real-time 2D Particle CFD Micro-Channel Heat Engine -->
+          <div class="col-span-7 scada-panel p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center pb-2 border-b border-slate-800 mb-2">
+                <div>
+                  <span class="font-bold text-slate-200 uppercase">GPU Cold Plate Micro-Channel CFD Particle Engine</span>
+                  <span class="text-[10px] text-slate-500 block font-sans">Simulating 24°C dielectric liquid entering micro-fins, absorbing 700W TDP, and exiting at 48°C</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-slate-900 border border-slate-700 text-cyan-400 text-[10px] font-bold" id="cfd-flow-badge">14.2 L/min per Tray</span>
+                  <button type="button" onclick="boostCoolantFlow()" class="px-2 py-0.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 rounded text-[10px]">
+                    <i class="fa-solid fa-gauge-high mr-1"></i>Boost Flow (+30%)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Canvas for CFD Flow Simulation -->
+              <div class="w-full h-72 bg-black rounded border border-slate-900 relative overflow-hidden flex items-center justify-center">
+                <canvas id="cfdCanvas" width="560" height="280"></canvas>
+                <div class="absolute top-2 left-2 text-[10px] text-cyan-400 font-mono">SUPPLY PLENUM: 24.2 °C (Chilled Inflow) &rarr;</div>
+                <div class="absolute bottom-2 right-2 text-[10px] text-rose-400 font-mono">&rarr; RETURN EXHAUST: 48.6 °C (Heated Effluent)</div>
+              </div>
+            </div>
+
+            <!-- Cold Plate Engineering Parameters -->
+            <div class="mt-3 pt-3 border-t border-slate-800 grid grid-cols-4 gap-2 text-center text-[11px]">
+              <div class="bg-black/60 p-2 rounded border border-slate-900">
+                <span class="text-slate-500 block text-[10px]">TRAY COLD PLATES</span>
+                <strong class="text-slate-200">8x H100 SXM5</strong>
+              </div>
+              <div class="bg-black/60 p-2 rounded border border-slate-900">
+                <span class="text-slate-500 block text-[10px]">MICROFIN PITCH</span>
+                <strong class="text-cyan-400">0.12 mm Skived</strong>
+              </div>
+              <div class="bg-black/60 p-2 rounded border border-slate-900">
+                <span class="text-slate-500 block text-[10px]">HEAT DISSIPATION</span>
+                <strong class="text-amber-400" id="cfd-heat-rate">5.60 kW / Tray</strong>
+              </div>
+              <div class="bg-black/60 p-2 rounded border border-slate-900">
+                <span class="text-slate-500 block text-[10px]">COOLANT THERMAL RES.</span>
+                <strong class="text-emerald-400">0.038 K/W</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 5: Safety Interlocks ==================== -->
+      <section id="scada-view-5" style="display: none;" class="space-y-4 font-scada text-xs">
+        <div class="scada-panel p-4">
+          <span class="text-amber-400 font-bold text-sm block mb-1">[F05] N+2 REDUNDANT SAFETY INTERLOCKS</span>
+          <p class="text-slate-400 text-[11px] font-sans mb-4">Fail-safe control states to prevent hydraulic cavitation or catastrophic facility thermal trips.</p>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="p-4 bg-black/60 border border-slate-800 rounded space-y-2">
+              <div class="flex justify-between items-center"><span class="font-bold text-slate-200">CDU PUMP P-01</span><span class="text-emerald-400 text-[10px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">RUNNING (78%)</span></div>
+              <p class="text-[11px] text-slate-500 font-sans">Primary variable frequency drive running nominal.</p>
+              <button type="button" onclick="tripPump()" class="w-full py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-xs font-bold">Simulate Pump P-01 Trip</button>
+            </div>
+            <div class="p-4 bg-black/60 border border-slate-800 rounded space-y-2">
+              <div class="flex justify-between items-center"><span class="font-bold text-slate-200">CDU PUMP P-02</span><span class="text-cyan-400 text-[10px] bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800" id="pump-2-badge">HOT STANDBY</span></div>
+              <p class="text-[11px] text-slate-500 font-sans">Sub-50ms automatic switch on pressure drop.</p>
+              <div class="text-[11px] text-slate-400 pt-1">Response Clock: &lt;42ms</div>
+            </div>
+            <div class="p-4 bg-black/60 border border-slate-800 rounded space-y-2">
+              <div class="flex justify-between items-center"><span class="font-bold text-slate-200">NVLINK BROADCAST CAP</span><span class="text-emerald-400 text-[10px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">ARMED</span></div>
+              <p class="text-[11px] text-slate-500 font-sans">Broadcast TDP caps to 3,200 GPUs in &lt;10ms.</p>
+              <button type="button" onclick="triggerPowerCap()" class="w-full py-1.5 bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded text-xs font-bold">Broadcast Emergency Cap</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 6: Telemetry & API ==================== -->
+      <section id="scada-view-6" style="display: none;" class="space-y-4 font-scada text-xs">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="scada-panel p-4 space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <span class="font-bold text-slate-300 uppercase">Modbus & BACnet Ingestion Stream</span>
+              <button type="button" onclick="pollSensors()" class="px-2 py-0.5 bg-slate-900 text-amber-400 border border-slate-700 rounded text-[11px]">Poll Stream</button>
+            </div>
+            <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-500">INGESTION THROUGHPUT:</span><span class="text-cyan-400 font-bold" id="tele-ingest">12,840 points/sec</span></div>
+            <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-500">DISPATCH LOOP LATENCY:</span><span class="text-emerald-400 font-bold" id="tele-loop-lat">3.84 ms</span></div>
+            <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-500">QUANTUM-2 IB SWITCHES:</span><span class="text-slate-300 font-bold">128 Leaf / 64 Spine</span></div>
+            <div class="flex justify-between border-b border-slate-900 pb-1.5"><span class="text-slate-500">FACILITY CARBON INTENSITY:</span><span class="text-emerald-400 font-bold">212 gCO2/kWh</span></div>
+          </div>
+
+          <div class="scada-panel p-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="font-bold text-slate-300 uppercase">Live REST Dispatch API Contract</span>
+              <button type="button" onclick="copyScadaCurl()" id="btn-scada-curl" class="px-2 py-0.5 bg-slate-900 text-slate-300 border border-slate-700 rounded text-[10px]">Copy cURL</button>
+            </div>
+            <div class="bg-black p-3 rounded border border-slate-900 text-amber-300 overflow-x-auto max-h-56">
+              <pre id="scada-api-output">{"status": "scada_engine_online", "pue": 1.118}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    var currentTab = 1;
+    var cfdRunning = false;
+    var coolantFlowRate = 14.2;
+
+    function showScadaTab(num) {
+      currentTab = num;
+      for (var i = 1; i <= 6; i++) {
+        var view = document.getElementById('scada-view-' + i);
+        var btn = document.getElementById('rail-btn-' + i);
+        if (i === num) {
+          view.style.display = 'block';
+          btn.className = "w-full text-left px-3 py-2.5 rounded border border-amber-500/80 bg-amber-950/30 text-amber-300 font-bold flex items-center justify-between";
+        } else {
+          view.style.display = 'none';
+          btn.className = "w-full text-left px-3 py-2.5 rounded border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 flex items-center justify-between";
+        }
+      }
+      if (num === 1) renderAisleGrids();
+      if (num === 3) drawBessChart();
+      if (num === 4) initCFD();
+    }
+
+    var rackList = [];
+    function initRackData(isAlert) {
+      rackList = [];
+      for (var i = 1; i <= 40; i++) {
+        var isHot = isAlert && (i === 18 || i === 19);
+        var temp = isHot ? 84.2 : (61 + Math.sin(i) * 5).toFixed(1);
+        var kw = isHot ? 138.4 : (112 + Math.cos(i) * 7).toFixed(1);
+        rackList.push({
+          id: i,
+          name: "R-" + (i < 10 ? "0" + i : i),
+          row: i <= 20 ? "A" : "B",
+          temp: parseFloat(temp),
+          kw: parseFloat(kw),
+          isHot: isHot
+        });
+      }
+    }
+
+    function renderAisleGrids() {
+      var gridA = document.getElementById('row-a-grid');
+      var gridB = document.getElementById('row-b-grid');
+      if (!gridA || !gridB) return;
+      gridA.innerHTML = "";
+      gridB.innerHTML = "";
+
+      rackList.forEach(function(r) {
+        var el = document.createElement('div');
+        var colorClass = r.temp >= 78 ? "bg-rose-600 text-white animate-pulse" : (r.temp >= 68 ? "bg-amber-500 text-black font-bold" : "bg-[#0b1322] border border-cyan-900/60 text-cyan-300");
+        el.className = "rack-blade p-2 rounded text-center cursor-pointer " + colorClass;
+        el.innerHTML = '<span class="text-[9px] block opacity-75">' + r.name + '</span><strong class="text-xs">' + r.temp + '°C</strong>';
+        el.onclick = function() { selectRack(r); };
+
+        if (r.row === "A") gridA.appendChild(el);
+        else gridB.appendChild(el);
+      });
+    }
+
+    function selectRack(r) {
+      document.getElementById('diag-rack-id').innerText = r.name + " (" + (r.row === "A" ? "ROW A" : "ROW B") + ") TELEMETRY";
+      document.getElementById('diag-temp').innerText = r.temp + " °C";
+      document.getElementById('diag-power').innerText = r.kw + " kW";
+      var status = document.getElementById('diag-status');
+      var valve = document.getElementById('diag-valve');
+
+      if (r.temp >= 78) {
+        status.className = "text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold";
+        status.innerText = "THROTTLING RISK";
+        valve.innerText = "42% (Constrained)";
+        valve.className = "text-rose-400 font-bold";
+      } else {
+        status.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold";
+        status.innerText = "NOMINAL HYDRAULIC FLOW";
+        valve.innerText = "88% (Balanced)";
+        valve.className = "text-emerald-400 font-bold";
+      }
+    }
+
+    function setHotspotAlert(isHot) {
+      initRackData(isHot);
+      renderAisleGrids();
+      selectRack(rackList[17]);
+      document.getElementById('live-grid-mw').innerText = isHot ? "14.82 MW" : "13.40 MW";
+      document.getElementById('live-pue').innerText = isHot ? "1.182" : "1.118";
+    }
+
+    function executeMitigation() {
+      document.getElementById('phase-1-badge').innerText = "DISPATCHED (92% FLOW)";
+      document.getElementById('phase-1-badge').className = "text-emerald-400 text-[10px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800";
+      document.getElementById('phase-2-badge').innerText = "MIGRATED (16 PODS)";
+      document.getElementById('phase-2-badge').className = "text-emerald-400 text-[10px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800";
+      document.getElementById('phase-3-badge').innerText = "POWER CAP RETURNED";
+      document.getElementById('post-mitigation-temp').innerText = "66.4 °C";
+      document.getElementById('post-mitigation-delta').innerText = "-17.8 °C STABILIZED";
+      setHotspotAlert(false);
+    }
+
+    function drawBessChart() {
+      var c = document.getElementById('bessCanvas');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+
+      ctx.strokeStyle = '#1e293b';
+      for (var y = 20; y < 240; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(900, y); ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 160);
+      ctx.bezierCurveTo(250, 160, 450, 20, 650, 40);
+      ctx.bezierCurveTo(750, 60, 800, 160, 900, 160);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 160);
+      ctx.bezierCurveTo(250, 160, 450, 90, 650, 90);
+      ctx.bezierCurveTo(750, 90, 800, 160, 900, 160);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ef4444';
+      ctx.font = '11px monospace';
+      ctx.fillText('Uncontrolled Surge Peak (16.8 MW)', 450, 25);
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('Peak Contract Cap (15.0 MW Limit)', 450, 82);
+    }
+
+    function simulateSpike() {
+      document.getElementById('bess-discharge-rate').innerText = "3.80 MW (BOOST)";
+      drawBessChart();
+    }
+
+    function selectTray(trayNum) {
+      document.querySelectorAll('.chassis-slot').forEach(function(el) { el.classList.remove('active'); });
+      event.currentTarget.classList.add('active');
+    }
+
+    var particles = [];
+    var NUM_PARTICLES = 120;
+
+    function initCFD() {
+      if (cfdRunning) return;
+      cfdRunning = true;
+
+      particles = [];
+      for (var i = 0; i < NUM_PARTICLES; i++) {
+        resetParticle(i, true);
+      }
+      runCFDLoop();
+    }
+
+    function resetParticle(idx, randomizeX) {
+      particles[idx] = {
+        x: randomizeX ? Math.random() * 560 : 10 + Math.random() * 20,
+        y: 40 + Math.random() * 200,
+        speed: (2.2 + Math.random() * 1.5) * (coolantFlowRate / 14.2),
+        size: 2.5 + Math.random() * 2.0
+      };
+    }
+
+    function boostCoolantFlow() {
+      coolantFlowRate = coolantFlowRate === 14.2 ? 18.5 : 14.2;
+      document.getElementById('cfd-flow-badge').innerText = coolantFlowRate.toFixed(1) + " L/min per Tray";
+      document.getElementById('cfd-heat-rate').innerText = (coolantFlowRate === 18.5 ? "6.85 kW" : "5.60 kW") + " / Tray";
+    }
+
+    function runCFDLoop() {
+      if (currentTab !== 4) {
+        cfdRunning = false;
+        return;
+      }
+
+      var c = document.getElementById('cfdCanvas');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#05070c';
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      var gpuPositions = [
+        {x: 160, y: 60}, {x: 260, y: 60}, {x: 360, y: 60}, {x: 460, y: 60},
+        {x: 160, y: 160}, {x: 260, y: 160}, {x: 360, y: 160}, {x: 460, y: 160}
+      ];
+
+      gpuPositions.forEach(function(gpu, index) {
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(gpu.x - 30, gpu.y - 25, 60, 50);
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(gpu.x - 30, gpu.y - 25, 60, 50);
+
+        var radGrad = ctx.createRadialGradient(gpu.x, gpu.y, 5, gpu.x, gpu.y, 45);
+        radGrad.addColorStop(0, 'rgba(244, 63, 94, 0.45)');
+        radGrad.addColorStop(1, 'rgba(244, 63, 94, 0)');
+        ctx.fillStyle = radGrad;
+        ctx.fillRect(gpu.x - 45, gpu.y - 45, 90, 90);
+
+        ctx.fillStyle = '#fecdd3';
+        ctx.font = '9px monospace';
+        ctx.fillText('GPU-' + (index + 1), gpu.x - 14, gpu.y + 3);
+      });
+
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.6)';
+      ctx.lineWidth = 1;
+      for (var lineY = 40; lineY <= 240; lineY += 20) {
+        ctx.beginPath();
+        ctx.moveTo(10, lineY);
+        ctx.lineTo(550, lineY);
+        ctx.stroke();
+      }
+
+      for (var p = 0; p < particles.length; p++) {
+        var pt = particles[p];
+        pt.x += pt.speed * (coolantFlowRate / 14.2);
+
+        var progress = Math.min(1, Math.max(0, (pt.x - 40) / 460));
+        var r = Math.floor(6 + progress * 238);
+        var g = Math.floor(182 - progress * 119);
+        var b = Math.floor(212 - progress * 148);
+
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+        ctx.shadowColor = 'rgb(' + r + ',' + g + ',' + b + ')';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (pt.x > 540) {
+          resetParticle(p, false);
+        }
+      }
+
+      requestAnimationFrame(runCFDLoop);
+    }
+
+    function tripPump() {
+      document.getElementById('pump-2-badge').className = "text-rose-400 text-[10px] bg-rose-950 px-2 py-0.5 rounded border border-rose-800 font-bold animate-pulse";
+      document.getElementById('pump-2-badge').innerText = "ENGAGED IN 38ms (P-02 ONLINE)";
+    }
+
+    function triggerPowerCap() {
+      alert("[NVLINK DISPATCH]: Emergency power cap (450W) broadcasted to 3,200 GPU nodes. Cluster draw reduced by 4.2 MW.");
+    }
+
+    function pollSensors() {
+      document.getElementById('tele-ingest').innerText = Math.floor(12800 + Math.random() * 200) + " points/sec";
+      document.getElementById('tele-loop-lat').innerText = (3.5 + Math.random() * 0.6).toFixed(2) + " ms";
+      document.getElementById('scada-api-output').innerText = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        facility_pue: 1.118,
+        active_racks: 40,
+        bess_discharge_mw: 2.4,
+        loop_status: "HEALTHY"
+      }, null, 2);
+    }
+
+    function copyScadaCurl() {
+      var curl = 'curl -X GET http://localhost:8001/api/v4/cluster-telemetry';
+      navigator.clipboard.writeText(curl);
+      var btn = document.getElementById('btn-scada-curl');
+      btn.innerText = "COPIED!";
+      setTimeout(function() { btn.innerText = "Copy cURL"; }, 1500);
+    }
+
+    window.onload = function() {
+      initRackData(true);
+      renderAisleGrids();
+      selectRack(rackList[17]);
+    };
+  </script>
+</body>
+</html>
